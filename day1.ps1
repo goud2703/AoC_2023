@@ -1,10 +1,11 @@
 $data = Get-Content "$($PSScriptRoot)/input1.txt"
 $numbers = 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'
+
 function Format-Number([string] $value, [string] $regex) {
     return [regex]::Match($_, $regex).Value + [regex]::Match($_, $regex, [System.Text.RegularExpressions.RegexOptions]::RightToLeft).Value
 }
  
-function Update-String-To-Number([string] $value){
+function Update-String-To-Number([string] $value) {
     $numbers | ForEach-Object {
         $value = $value -replace $_, ($numbers.IndexOf($_) + 1)
     }
