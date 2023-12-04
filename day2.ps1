@@ -25,7 +25,7 @@ function Get-Subsets-Maximum-Value([Array]$Subsets, [string]$Color)
     return $SubsetMaximumValue.Maximum
 }
 
-# Part 1
+#part 1
 $data | Where-Object {
     $_ -match "Game (\d+):(.*)" | Out-Null
     $Subsets = $Matches[2] -split ";"
@@ -35,7 +35,7 @@ $data | Where-Object {
     $Matches[1]
 } | Measure-Object -Sum
 
-# Part 1
+#part 2
 $data | ForEach-Object {
     $_ -match "Game (\d+):(.*)" | Out-Null
     $Subsets = $Matches[2] -split ";"

@@ -1,86 +1,71 @@
 $data = Get-Content "$( $PSScriptRoot )/input3.txt"
 
-function Get-Row-Special-Character([string]$RowValues, [int]$RowIndex, [string]$Regex = "[^\.|\d]")
+function Get-Parts([string]$RowValues, [int]$RowIndex, [string]$Regex)
 {
     $SpecialCaracters = [regex]::Matches($RowValues, $Regex)
     $SpecialCaracters.Captures | ForEach-Object {
         @{
             row = $RowIndex
             column = $_.Index
+            value = $_.Value
         }
     } | Where-Object -Property column -NE $null
 }
 
+function Validate-Part($Part, $SpecialCharacter)
+{
+    $ContainsColumn = Compare-Object -ReferenceObject $Part.columns -DifferenceObject $SpecialCharacter.columns -PassThru -IncludeEqual -ExcludeDifferent
+    $ContainsRow = Compare-Object -ReferenceObject $Part.row -DifferenceObject $SpecialCharacter.rows -PassThru -IncludeEqual -ExcludeDifferent
+    return $ContainsColumn.Count -gt 0 -and $ContainsRow.Count -gt 0
+}
+
 $SpecialCharacters = $data | ForEach-Object -Begin { $counter = 0 } -Process {
-    Get-Row-Special-Character -RowIndex $counter -RowValues $_
+    Get-Parts -RowIndex $counter -RowValues $_ -Regex "[^\.\d]"
     $counter++
+} | ForEach-Object {
+    @{
+        value = $_.value
+        column = $_.column
+        row = $_.row
+        rows = ($_.row - 1)..($_.row + 1)
+        columns = ($_.column - 1)..($_.column + 1)
+    }
 }
 
-$Gears = $data | ForEach-Object -Begin { $counter = 0 } -Process {
-    Get-Row-Special-Character -RowIndex $counter -RowValues $_ -Regex "\*"
-    $counter++
-}
-
-function Test-Near-Number([int]$SpecialCharacterRow, [int]$SpecialCharacterColumn, [int]$NumberRow, [int]$NumberColumn)
-{
-    ($NumberRow -in ([int]$SpecialCharacterRow - 1)..([int]$SpecialCharacterRow + 1)) -and
-            ($NumberColumn -in ([int]$SpecialCharacterColumn - 1)..([int]$SpecialCharacterColumn + 1))
-}
-
-function Get-Row-Numbers([string]$RowValues, [int]$RowIndex)
-{
-    $RowNumbers = [regex]::Matches($RowValues, "(\d+)")
-    $RowNumbers.Captures | ForEach-Object {
-        @{
-            value = [int]$_.Value
-            row = $RowIndex
-            column = $_.Index
-        }
-    } | Where-Object -Property value -ne $null
-}
-
-function Test-Number-Near-Special-Charater([int]$NumberRow, [int]$NumberColumn, [string]$NumberValue)
-{
-    (0..($NumberValue.Length - 1) | Foreach-Object {
-        $NumberCount = $_
-        $SpecialCharacters | ForEach-Object {
-            $result = Test-Near-Number -SpecialCharacterRow $_.row -SpecialCharacterColumn $_.column -NumberRow $NumberRow -NumberColumn ($NumberColumn + $NumberCount)
-            #            Write-Host $_.row $_.column $NumberRow ($NumberColumn + $NumberCount) $result
-            return $result
-        }
-    }) -contains $true
-}
+$Gears = $SpecialCharacters | Where-Object  -Property Value -EQ "*"
 
 $Numbers = $data | ForEach-Object -Begin { $counter = 0 } -Process {
-    Get-Row-Numbers -RowValues $_ -RowIndex $counter
+    Get-Parts -RowIndex $counter -RowValues $_ -Regex "\d+"
     $counter++
+} | ForEach-Object {
+    @{
+        value = $_.value
+        column = $_.column
+        row = $_.row
+        columns = $_.column..($_.column + $_.value.length - 1)
+    }
 }
 
-# Part 1
-$data | ForEach-Object -Begin { $counter = 0 } -Process {
-    Get-Row-Numbers -RowValues $_ -RowIndex $counter
-    $counter++
-} | Where-Object {
-    Test-Number-Near-Special-Charater -NumberRow $_.row -NumberColumn $_.column -NumberValue $_.value
+#part 1
+$Numbers | Where-Object {
+    $CurrentNumber = $_
+    $SpecialCharacters | Where-Object {
+        Validate-Part -Part $CurrentNumber -SpecialCharacter $_
+    }
 } | ForEach-Object {
     [int]$_.value
 } | Measure-Object -Sum
 
-# Part 2
-$Gears | ForEach-Object {
-    $Gear = $_
-    $CloseNumbers = $Numbers | Where-Object {
-        #        Test-Near-Number -SpecialCharacterRow $Gear.row -SpecialCharacterColumn $Gear.column -NumberRow $_.row -NumberColumn $_.column
-        $CurrentNumber = $_
-        (0..(([string]$_.Value).Length - 1) | Foreach-Object {
-            $NumberCount = $_
-            Test-Near-Number -SpecialCharacterRow $Gear.row -SpecialCharacterColumn $Gear.column -NumberRow $CurrentNumber.row -NumberColumn ($CurrentNumber.column + $NumberCount)
-        }) -contains $true
+#part 2
+$Gears | Foreach-Object {
+    $CurrentGear = $_
+    $MatchingGears = $Numbers | Where-Object {
+        Validate-Part -Part $_ -SpecialCharacter $CurrentGear
+    } | Foreach-Object {
+        [int]$_.value
     }
-    $FoundNumbers = $CloseNumbers | ForEach-Object { $_.value }
-
-    if ($FoundNumbers.Count -eq 2)
+    if ($MatchingGears.Count -eq 2)
     {
-        return [int]($FoundNumbers[0] * $FoundNumbers[1])
+        $MatchingGears[0] * $MatchingGears[1]
     }
 } | Measure-Object -Sum
